@@ -75,8 +75,7 @@ CREATE TABLE stations (
     has_inn BOOLEAN DEFAULT FALSE COMMENT '是否有旅馆',
     has_mission_board BOOLEAN DEFAULT FALSE COMMENT '是否有任务板',
     market_tax_rate DECIMAL(5,2) DEFAULT 5.00 COMMENT '市场税率，影响交易成本',
-    FOREIGN KEY (system_id) REFERENCES star_systems(system_id),
-    FOREIGN KEY (planet_id) REFERENCES planets(planet_id)
+    FOREIGN KEY (system_id) REFERENCES star_systems(system_id)
 ) COMMENT '存储游戏中的空间站信息';
 
 CREATE TABLE station_shop_items (
@@ -474,7 +473,7 @@ VALUES
 
 ('自治走廊（Zoner Arc）', '由拓荒者建立的中立走廊，空间站零散但稳定，是边缘科学家和和平主义者的庇护所。', 3, 2, 'mid', 9, 200.0, 120.0, 30.0, TRUE),
 
-('佣兵走廊（Hunter's Range）', '赏金猎人公会控制的星区，几乎每天都有战斗发生，是雇佣兵试炼的摇篮。', 5, 7, 'mid', 7, 150.0, 30.0, 75.0, TRUE),
+('佣兵走廊（Hunter''s Range）', '赏金猎人公会控制的星区，几乎每天都有战斗发生，是雇佣兵试炼的摇篮。', 5, 7, 'mid', 7, 150.0, 30.0, 75.0, TRUE),
 
 ('奥米克隆阿尔法（Omicron Alpha）', 'Outcasts的首都星系，是Cardamine毒品的产地与走私枢纽，极度危险但利润丰厚。', 8, 9, 'rim', 12, 220.0, 80.0, 90.0, FALSE),
 

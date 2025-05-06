@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <main-navbar />
-    <main class="main-content">
+    <main class="main-content" :class="{'galaxy-map-route': $route.name === 'GalaxyMap'}">
       <router-view />
     </main>
   </div>
@@ -31,5 +31,13 @@ export default {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+}
+
+/* 特殊情况：当路由为galaxy-map时，取消宽度限制 */
+.galaxy-map-route {
+  max-width: 100% !important;
+  width: 100vw !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 </style>
