@@ -50,3 +50,30 @@ Thumbs.db
 # Logs
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Node.js
+node_modules/
+jspm_packages/
+.npm
+.node_repl_history
+.yarn-integrity
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vue.js
+/dist
+.cache/
+.eslintcache
+.stylelintcache
+
+# Build & bundle
+coverage
+temp
+.history
+.vercel

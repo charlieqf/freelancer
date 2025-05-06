@@ -2,7 +2,31 @@
  * 认证服务
  * 提供用户注册、登录、注销和令牌管理功能
  */
+import axios from 'axios';
+
 const API_URL = 'http://localhost:5000/api/auth/';
+
+// 创建axios实例
+const apiClient = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// 请求拦截器
+apiClient.interceptors.request.use(
+  config => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user && user.access_token) {
+      config.headers.Authorization = `Bearer ${user.access_token}`;
+    }
+    return config;
+  },
+  error => {
+    return Promise.reject(error);
+  }
+);
 
 /**
  * 注册新用户
@@ -14,31 +38,19 @@ const API_URL = 'http://localhost:5000/api/auth/';
  */
 const register = async (username, email, password, factionId = 1) => {
   try {
-    const response = await fetch(`${API_URL}register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username,
-        email,
-        password,
-        faction_id: factionId
-      }),
+    const response = await apiClient.post('register', {
+      username,
+      email,
+      password,
+      faction_id: factionId
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || '注册失败');
-    }
-
     // 保存令牌和用户信息到localStorage
-    if (data.access_token) {
-      localStorage.setItem('user', JSON.stringify(data));
+    if (response.data.access_token) {
+      localStorage.setItem('user', JSON.stringify(response.data));
     }
 
-    return data;
+    return response.data;
   } catch (error) {
     console.error('注册错误:', error);
     throw error;
@@ -53,29 +65,17 @@ const register = async (username, email, password, factionId = 1) => {
  */
 const login = async (username, password) => {
   try {
-    const response = await fetch(`${API_URL}login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username,
-        password
-      }),
+    const response = await apiClient.post('login', {
+      username,
+      password
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || '登录失败');
-    }
-
     // 保存令牌和用户信息到localStorage
-    if (data.access_token) {
-      localStorage.setItem('user', JSON.stringify(data));
+    if (response.data.access_token) {
+      localStorage.setItem('user', JSON.stringify(response.data));
     }
 
-    return data;
+    return response.data;
   } catch (error) {
     console.error('登录错误:', error);
     throw error;
@@ -91,39 +91,29 @@ const logout = () => {
 
 /**
  * 刷新访问令牌
+ * @param {string} refreshToken 刷新令牌
  * @returns {Promise<Object>} 包含新访问令牌的对象
  */
-const refreshToken = async () => {
+const refreshToken = async (refreshToken) => {
   try {
-    const user = JSON.parse(localStorage.getItem('user'));
-
-    if (!user || !user.refresh_token) {
-      throw new Error('没有可用的刷新令牌');
-    }
-
-    const response = await fetch(`${API_URL}refresh`, {
-      method: 'POST',
+    const response = await axios.post(`${API_URL}refresh`, {}, {
       headers: {
-        'Authorization': `Bearer ${user.refresh_token}`,
-        'Content-Type': 'application/json',
-      },
+        'Authorization': `Bearer ${refreshToken}`
+      }
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || '刷新令牌失败');
-    }
-
-    // 更新localStorage中的访问令牌
-    if (data.access_token) {
-      user.access_token = data.access_token;
+    // 更新localStorage中的令牌
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user && response.data.access_token) {
+      user.access_token = response.data.access_token;
       localStorage.setItem('user', JSON.stringify(user));
     }
 
-    return data;
+    return response.data;
   } catch (error) {
     console.error('刷新令牌错误:', error);
+    // 刷新令牌失败，清除用户信息
+    localStorage.removeItem('user');
     throw error;
   }
 };
@@ -133,44 +123,26 @@ const refreshToken = async () => {
  * @returns {Object|null} 用户信息对象或null
  */
 const getCurrentUser = () => {
-  const userStr = localStorage.getItem('user');
-  if (!userStr) return null;
-  
-  try {
-    return JSON.parse(userStr);
-  } catch (e) {
-    console.error('解析用户信息失败:', e);
-    return null;
-  }
+  const user = localStorage.getItem('user');
+  return user ? JSON.parse(user) : null;
 };
 
 /**
  * 获取用户个人资料
  * @returns {Promise<Object>} 用户个人资料
  */
-const getProfile = async () => {
+const getUserProfile = async () => {
   try {
-    const user = getCurrentUser();
+    const response = await apiClient.get('profile');
     
-    if (!user || !user.access_token) {
-      throw new Error('未登录');
+    // 更新localStorage中的用户信息
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      user.user = response.data;
+      localStorage.setItem('user', JSON.stringify(user));
     }
-    
-    const response = await fetch(`${API_URL}profile`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${user.access_token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || '获取个人资料失败');
-    }
-    
-    return data;
+
+    return response.data;
   } catch (error) {
     console.error('获取个人资料错误:', error);
     throw error;
@@ -182,30 +154,18 @@ const getProfile = async () => {
  * @param {Object} profileData 要更新的个人资料数据
  * @returns {Promise<Object>} 更新后的用户个人资料
  */
-const updateProfile = async (profileData) => {
+const updateUserProfile = async (profileData) => {
   try {
-    const user = getCurrentUser();
+    const response = await apiClient.put('profile', profileData);
     
-    if (!user || !user.access_token) {
-      throw new Error('未登录');
+    // 更新localStorage中的用户信息
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      user.user = response.data;
+      localStorage.setItem('user', JSON.stringify(user));
     }
-    
-    const response = await fetch(`${API_URL}profile`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${user.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(profileData),
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || '更新个人资料失败');
-    }
-    
-    return data;
+
+    return response.data;
   } catch (error) {
     console.error('更新个人资料错误:', error);
     throw error;
@@ -220,31 +180,12 @@ const updateProfile = async (profileData) => {
  */
 const changePassword = async (currentPassword, newPassword) => {
   try {
-    const user = getCurrentUser();
-    
-    if (!user || !user.access_token) {
-      throw new Error('未登录');
-    }
-    
-    const response = await fetch(`${API_URL}change-password`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${user.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        current_password: currentPassword,
-        new_password: newPassword
-      }),
+    const response = await apiClient.put('change-password', {
+      current_password: currentPassword,
+      new_password: newPassword
     });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || '修改密码失败');
-    }
-    
-    return data;
+
+    return response.data;
   } catch (error) {
     console.error('修改密码错误:', error);
     throw error;
@@ -258,8 +199,8 @@ const authService = {
   logout,
   refreshToken,
   getCurrentUser,
-  getProfile,
-  updateProfile,
+  getUserProfile,
+  updateUserProfile,
   changePassword
 };
 
