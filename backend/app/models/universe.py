@@ -41,7 +41,8 @@ class StarSystem(db.Model):
             'x_coord': self.x_coord,
             'y_coord': self.y_coord,
             'z_coord': self.z_coord,
-            'is_discovered': self.is_discovered
+            'is_discovered': self.is_discovered,
+            'planet_count': len(self.planets) if self.planets else 0
         }
         
         # 包含关联数据
@@ -85,7 +86,7 @@ class Planet(db.Model):
 # 空间站模型
 class SpaceStation(db.Model):
     """空间站模型"""
-    __tablename__ = 'space_stations'
+    __tablename__ = 'stations'
     
     station_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     system_id = db.Column(db.Integer, db.ForeignKey('star_systems.system_id'), nullable=False)
@@ -95,10 +96,10 @@ class SpaceStation(db.Model):
     controlling_faction_id = db.Column(db.Integer, db.ForeignKey('factions.faction_id'))
     has_shipyard = db.Column(db.Boolean, default=False)
     has_bar = db.Column(db.Boolean, default=False)
-    has_trade_center = db.Column(db.Boolean, default=False)
+    has_shop = db.Column(db.Boolean, default=False)
     has_mission_board = db.Column(db.Boolean, default=False)
-    has_equipment_dealer = db.Column(db.Boolean, default=False)
-    price_modifier = db.Column(db.Float, default=1.0)
+    has_inn = db.Column(db.Boolean, default=False)
+    market_tax_rate = db.Column(db.Float, default=5.0)
     
     # 关系
     planet = db.relationship('Planet', lazy=True)
@@ -116,10 +117,10 @@ class SpaceStation(db.Model):
             'controlling_faction_id': self.controlling_faction_id,
             'has_shipyard': self.has_shipyard,
             'has_bar': self.has_bar,
-            'has_trade_center': self.has_trade_center,
+            'has_trade_center': self.has_shop,
             'has_mission_board': self.has_mission_board,
-            'has_equipment_dealer': self.has_equipment_dealer,
-            'price_modifier': self.price_modifier
+            'has_equipment_dealer': self.has_inn,
+            'price_modifier': self.market_tax_rate
         }
 
 # 跳跃点模型
@@ -130,14 +131,14 @@ class JumpGate(db.Model):
     gate_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100), nullable=False)
     source_system_id = db.Column(db.Integer, db.ForeignKey('star_systems.system_id'), nullable=False)
-    target_system_id = db.Column(db.Integer, db.ForeignKey('star_systems.system_id'), nullable=False)
-    difficulty_level = db.Column(db.Integer, default=1)
+    destination_system_id = db.Column(db.Integer, db.ForeignKey('star_systems.system_id'), nullable=False)
+    stability = db.Column(db.Integer, default=10)
     toll_fee = db.Column(db.Float, default=0.0)
-    is_hidden = db.Column(db.Boolean, default=False)
+    one_way = db.Column(db.Boolean, default=False)
     
     # 关系
     source_system = db.relationship('StarSystem', foreign_keys=[source_system_id], lazy=True)
-    target_system = db.relationship('StarSystem', foreign_keys=[target_system_id], lazy=True)
+    target_system = db.relationship('StarSystem', foreign_keys=[destination_system_id], lazy=True)
     
     # 将跳跃点数据转换为字典
     def to_dict(self, include_systems=False):
@@ -146,10 +147,10 @@ class JumpGate(db.Model):
             'gate_id': self.gate_id,
             'name': self.name,
             'source_system_id': self.source_system_id,
-            'target_system_id': self.target_system_id,
-            'difficulty_level': self.difficulty_level,
+            'target_system_id': self.destination_system_id,
+            'difficulty_level': self.stability,
             'toll_fee': self.toll_fee,
-            'is_hidden': self.is_hidden
+            'is_hidden': self.one_way
         }
         
         # 包含关联系统数据

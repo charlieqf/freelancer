@@ -104,6 +104,7 @@ def get_all_stations():
     try:
         # 获取查询参数
         system_id = request.args.get('system_id', type=int)
+        show_all = request.args.get('show_all', 'false').lower() == 'true'
         
         # 获取当前用户
         user_id = get_jwt_identity()
@@ -111,9 +112,22 @@ def get_all_stations():
         
         if not user:
             return jsonify({'error': '无效的用户'}), 401
+        
+        # 添加调试信息
+        print(f"查询空间站，参数：system_id={system_id}, show_all={show_all}")
             
         # 构建查询
         query = SpaceStation.query
+        
+        # 如果不显示所有空间站，需要检查星系是否被发现
+        if not show_all:
+            # 只显示已发现星系中的空间站
+            query = query.join(StarSystem, SpaceStation.system_id == StarSystem.system_id).filter(
+                db.or_(
+                    StarSystem.is_discovered == True,
+                    StarSystem.type == 'core'
+                )
+            )
         
         # 如果指定了system_id，只返回该星系中的空间站
         if system_id:
@@ -122,13 +136,18 @@ def get_all_stations():
                 return jsonify({'error': '星系不存在'}), 404
                 
             # 检查是否为玩家已发现的星系或初始星系
-            if not system.is_discovered and system.type != 'core':
+            if not show_all and not system.is_discovered and system.type != 'core':
                 return jsonify({'error': '星系尚未发现'}), 403
                 
-            query = query.filter_by(system_id=system_id)
+            query = query.filter(SpaceStation.system_id == system_id)
             
         # 获取空间站
         stations = query.all()
+        
+        # 打印数据库查询结果
+        print(f"查询到 {len(stations)} 个空间站")
+        for station in stations:
+            print(f"空间站ID: {station.station_id}, 名称: {station.name}, 所属星系: {station.system_id}")
         
         # 构造响应数据
         stations_data = [station.to_dict() for station in stations]
@@ -198,6 +217,7 @@ def get_all_jumpgates():
     try:
         # 获取查询参数
         system_id = request.args.get('system_id', type=int)
+        show_all = request.args.get('show_all', 'false').lower() == 'true'
         
         # 获取当前用户
         user_id = get_jwt_identity()
@@ -206,8 +226,21 @@ def get_all_jumpgates():
         if not user:
             return jsonify({'error': '无效的用户'}), 401
             
+        # 添加调试信息
+        print(f"查询跳跃点，参数：system_id={system_id}, show_all={show_all}")
+            
         # 构建查询
         query = JumpGate.query
+        
+        # 如果不显示所有跳跃点，需要筛选未发现星系中的跳跃点
+        if not show_all:
+            # 只显示已知星系的跳跃点
+            query = query.join(StarSystem, JumpGate.source_system_id == StarSystem.system_id).filter(
+                db.or_(
+                    StarSystem.is_discovered == True,
+                    StarSystem.type == 'core'
+                )
+            )
         
         # 如果指定了system_id，只返回该星系的跳跃点
         if system_id:
@@ -216,21 +249,21 @@ def get_all_jumpgates():
                 return jsonify({'error': '星系不存在'}), 404
                 
             # 检查是否为玩家已发现的星系或初始星系
-            if not system.is_discovered and system.type != 'core':
+            if not show_all and not system.is_discovered and system.type != 'core':
                 return jsonify({'error': '星系尚未发现'}), 403
                 
-            query = query.filter_by(source_system_id=system_id)
+            query = query.filter(JumpGate.source_system_id == system_id)
             
         # 获取跳跃点
         gates = query.all()
         
-        # 构造响应数据
-        gates_data = []
+        # 打印数据库查询结果
+        print(f"查询到 {len(gates)} 个跳跃点")
         for gate in gates:
-            # 仅包含非隐藏或已发现目标系统的跳跃点
-            target_system = StarSystem.query.get(gate.target_system_id)
-            if not gate.is_hidden or target_system.is_discovered or target_system.type == 'core':
-                gates_data.append(gate.to_dict(include_systems=True))
+            print(f"跳跃点ID: {gate.gate_id}, 名称: {gate.name}, 源星系: {gate.source_system_id}, 目标星系: {gate.destination_system_id}")
+        
+        # 构造响应数据
+        gates_data = [gate.to_dict() for gate in gates]
         
         return jsonify({
             'success': True,

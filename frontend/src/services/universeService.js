@@ -106,18 +106,38 @@ const universeService = {
   
   /**
    * 获取所有空间站
-   * @param {Number} systemId 可选，指定星系ID
+   * @param {Number|Object} systemIdOrOptions 可选，星系ID或选项对象
+   * @param {Boolean} systemIdOrOptions.showAll 是否显示所有空间站，包括未发现星系中的
+   * @param {Number} systemIdOrOptions.systemId 可选的星系ID
    * @returns {Promise} 返回空间站数据
    */
-  async getStations(systemId = null) {
-    try {
-      const params = systemId ? { system_id: systemId } : {};
-      const response = await universeApi.get('/stations', { params });
-      return response.data;
-    } catch (error) {
-      console.error('获取空间站数据失败:', error);
-      throw error;
+  getStations(systemIdOrOptions = null) {
+    let params = new URLSearchParams();
+    let systemId = null;
+    
+    // 处理参数
+    if (typeof systemIdOrOptions === 'object' && systemIdOrOptions !== null) {
+      if (systemIdOrOptions.showAll) {
+        params.append('show_all', 'true');
+      }
+      systemId = systemIdOrOptions.systemId;
+    } else {
+      systemId = systemIdOrOptions;
     }
+    
+    // 添加系统ID参数（如果有）
+    if (systemId) {
+      params.append('system_id', systemId);
+    }
+    
+    return universeApi.get(`/stations${params.toString() ? '?' + params.toString() : ''}`)
+      .then(response => {
+        if (response.data.success) {
+          return response.data.stations;
+        } else {
+          throw new Error(response.data.error || '获取空间站数据失败');
+        }
+      });
   },
   
   /**
@@ -137,18 +157,38 @@ const universeService = {
   
   /**
    * 获取所有跳跃点
-   * @param {Number} systemId 可选，指定星系ID
+   * @param {Number|Object} systemIdOrOptions 可选，星系ID或选项对象
+   * @param {Boolean} systemIdOrOptions.showAll 是否显示所有跳跃点，包括未发现星系中的
+   * @param {Number} systemIdOrOptions.systemId 可选的星系ID
    * @returns {Promise} 返回跳跃点数据
    */
-  async getJumpGates(systemId = null) {
-    try {
-      const params = systemId ? { system_id: systemId } : {};
-      const response = await universeApi.get('/jumpgates', { params });
-      return response.data;
-    } catch (error) {
-      console.error('获取跳跃点数据失败:', error);
-      throw error;
+  getJumpGates(systemIdOrOptions = null) {
+    let params = new URLSearchParams();
+    let systemId = null;
+    
+    // 处理参数
+    if (typeof systemIdOrOptions === 'object' && systemIdOrOptions !== null) {
+      if (systemIdOrOptions.showAll) {
+        params.append('show_all', 'true');
+      }
+      systemId = systemIdOrOptions.systemId;
+    } else {
+      systemId = systemIdOrOptions;
     }
+    
+    // 添加系统ID参数（如果有）
+    if (systemId) {
+      params.append('system_id', systemId);
+    }
+    
+    return universeApi.get(`/jumpgates${params.toString() ? '?' + params.toString() : ''}`)
+      .then(response => {
+        if (response.data.success) {
+          return response.data.jumpgates;
+        } else {
+          throw new Error(response.data.error || '获取跳跃点数据失败');
+        }
+      });
   },
   
   /**

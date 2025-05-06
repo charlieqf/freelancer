@@ -100,16 +100,23 @@ const actions = {
   /**
    * 加载空间站数据
    * @param {Object} context Vuex 上下文
-   * @param {Number} systemId 可选，指定星系ID
+   * @param {Number|Object} systemIdOrOptions 可选，星系ID或选项对象
    */
-  async fetchStations({ commit }, systemId = null) {
+  async fetchStations({ commit }, systemIdOrOptions = null) {
     commit('SET_LOADING', true);
     commit('SET_ERROR', null);
     
     try {
-      const response = await universeService.getStations(systemId);
-      commit('SET_STATIONS', response.stations);
-      return response.stations;
+      // 如果只是传入了systemId，转换为对象格式
+      const options = typeof systemIdOrOptions === 'number' 
+        ? { systemId: systemIdOrOptions, showAll: true } 
+        : { ...systemIdOrOptions, showAll: true };
+      
+      console.log('调用空间站服务，options:', options);
+      const response = await universeService.getStations(options);
+      console.log('空间站服务返回数据:', response);
+      commit('SET_STATIONS', response);  
+      return response;
     } catch (error) {
       commit('SET_ERROR', error.response?.data?.error || '无法加载空间站数据');
       console.error('加载空间站数据失败:', error);
@@ -122,16 +129,23 @@ const actions = {
   /**
    * 加载跳跃点数据
    * @param {Object} context Vuex 上下文
-   * @param {Number} systemId 可选，指定星系ID
+   * @param {Number|Object} systemIdOrOptions 可选，星系ID或选项对象
    */
-  async fetchJumpGates({ commit }, systemId = null) {
+  async fetchJumpGates({ commit }, systemIdOrOptions = null) {
     commit('SET_LOADING', true);
     commit('SET_ERROR', null);
     
     try {
-      const response = await universeService.getJumpGates(systemId);
-      commit('SET_JUMP_GATES', response.jumpgates);
-      return response.jumpgates;
+      // 如果只是传入了systemId，转换为对象格式
+      const options = typeof systemIdOrOptions === 'number' 
+        ? { systemId: systemIdOrOptions, showAll: true } 
+        : { ...systemIdOrOptions, showAll: true };
+      
+      console.log('调用跳跃点服务，options:', options);
+      const response = await universeService.getJumpGates(options);
+      console.log('跳跃点服务返回数据:', response);
+      commit('SET_JUMP_GATES', response);  
+      return response;
     } catch (error) {
       commit('SET_ERROR', error.response?.data?.error || '无法加载跳跃点数据');
       console.error('加载跳跃点数据失败:', error);

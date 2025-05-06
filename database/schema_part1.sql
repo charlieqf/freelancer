@@ -69,7 +69,6 @@ CREATE TABLE stations (
     planet_id INT NULL COMMENT '所属行星ID，可以为NULL表示深空空间站',
     controlling_faction_id INT COMMENT '控制该空间站的势力ID',
     has_shipyard BOOLEAN DEFAULT FALSE COMMENT '是否有船坞',
-    has_market BOOLEAN DEFAULT FALSE COMMENT '是否有市场',
     has_shop BOOLEAN DEFAULT FALSE COMMENT '是否有商店',
     has_bar BOOLEAN DEFAULT FALSE COMMENT '是否有酒吧',
     has_inn BOOLEAN DEFAULT FALSE COMMENT '是否有旅馆',
