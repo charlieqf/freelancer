@@ -7,6 +7,7 @@ api_bp = Blueprint('api', __name__)
 
 # 从该包中导入路由模块
 from . import users
+from .auth import auth_bp
 
 # 以下模块将在后续开发中添加
 # from . import systems, ships, trading, missions, factions

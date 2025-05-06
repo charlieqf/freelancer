@@ -6,34 +6,19 @@ USE freelancer;
 -- 经济与贸易表
 -- -----------------------------------------------------
 
--- 商品表
--- 存储游戏中可交易的商品
-CREATE TABLE commodities (
-    commodity_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '商品ID，主键',
-    name VARCHAR(100) NOT NULL COMMENT '商品名称',
-    description TEXT COMMENT '商品描述',
-    base_price DECIMAL(15,2) NOT NULL COMMENT '基础价格',
-    manufacturer_id INT COMMENT '生产商ID',
-    weight INT COMMENT '单位重量',
-    is_legal BOOLEAN DEFAULT TRUE COMMENT '是否合法物品',
-    contraband_level TINYINT DEFAULT 0 COMMENT '违禁等级(0-10)，0表示完全合法',
-    image_url VARCHAR(255) COMMENT '商品图片URL',
-    FOREIGN KEY (manufacturer_id) REFERENCES manufacturers(manufacturer_id)
-) COMMENT '存储游戏中可交易的所有商品信息';
-
 -- 市场价格表
 -- 记录各空间站的商品价格
 CREATE TABLE market_prices (
     price_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '价格记录ID，主键',
     station_id INT NOT NULL COMMENT '空间站ID',
-    commodity_id INT NOT NULL COMMENT '商品ID',
+    item_id INT NOT NULL COMMENT '商品ID',
     buy_price DECIMAL(15,2) COMMENT '玩家可以购买的价格',
     sell_price DECIMAL(15,2) COMMENT '玩家可以出售的价格',
     available_quantity INT COMMENT '市场上可用数量',
     demand_level TINYINT COMMENT '需求等级(1-10)',
     last_updated DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '价格最后更新时间',
     FOREIGN KEY (station_id) REFERENCES stations(station_id),
-    FOREIGN KEY (commodity_id) REFERENCES commodities(commodity_id)
+    FOREIGN KEY (item_id) REFERENCES items(item_id)
 ) COMMENT '记录每个空间站的商品价格信息';
 
 -- 交易历史表
@@ -43,7 +28,7 @@ CREATE TABLE trade_history (
     user_id INT NOT NULL COMMENT '用户ID',
     ship_id INT NOT NULL COMMENT '使用的飞船ID',
     station_id INT NOT NULL COMMENT '交易的空间站ID',
-    commodity_id INT NOT NULL COMMENT '交易的商品ID',
+    item_id INT NOT NULL COMMENT '交易的商品ID',
     quantity INT NOT NULL COMMENT '交易数量',
     unit_price DECIMAL(15,2) NOT NULL COMMENT '单价',
     total_price DECIMAL(15,2) NOT NULL COMMENT '总价',
@@ -53,45 +38,8 @@ CREATE TABLE trade_history (
     FOREIGN KEY (user_id) REFERENCES users(user_id),
     FOREIGN KEY (ship_id) REFERENCES player_ships(ship_id),
     FOREIGN KEY (station_id) REFERENCES stations(station_id),
-    FOREIGN KEY (commodity_id) REFERENCES commodities(commodity_id)
+    FOREIGN KEY (item_id) REFERENCES items(item_id)
 ) COMMENT '记录所有玩家的交易历史';
-
--- 数据示例：commodities
-INSERT INTO commodities (name, description, base_price, manufacturer_id, weight, is_legal, contraband_level, image_url)
-VALUES 
-('食品供应', '基础食品补给', 50.00, 1, 1, TRUE, 0, '/assets/commodities/food.png'),
-('医疗用品', '基础医疗物资', 100.00, 6, 1, TRUE, 0, '/assets/commodities/medical.png'),
-('矿石', '未加工的矿石', 200.00, 2, 5, TRUE, 0, '/assets/commodities/ore.png'),
-('稀有金属', '精炼的稀有金属', 500.00, 2, 3, TRUE, 0, '/assets/commodities/metals.png'),
-('高级电子元件', '先进的电子零部件', 800.00, 8, 2, TRUE, 0, '/assets/commodities/electronics.png'),
-('奢侈品', '高价值的奢侈商品', 1500.00, 5, 1, TRUE, 0, '/assets/commodities/luxury.png'),
-('军用装备', '军事用途的装备', 2000.00, 3, 4, FALSE, 5, '/assets/commodities/military.png'),
-('红花粉', '违禁药物', 5000.00, NULL, 1, FALSE, 8, '/assets/commodities/drugs.png'),
-('武器零件', '非法武器制造材料', 3000.00, 3, 3, FALSE, 7, '/assets/commodities/weapon_parts.png');
-
--- 数据示例：market_prices
-INSERT INTO market_prices (station_id, commodity_id, buy_price, sell_price, available_quantity, demand_level, last_updated)
-VALUES 
-(1, 1, 50.00, 45.00, 1000, 5, '2025-05-01 10:00:00'),
-(1, 2, 100.00, 90.00, 500, 7, '2025-05-01 10:00:00'),
-(1, 3, 200.00, 180.00, 300, 3, '2025-05-01 10:00:00'),
-(1, 4, 500.00, 450.00, 150, 6, '2025-05-01 10:00:00'),
-(2, 1, 60.00, 55.00, 800, 8, '2025-05-01 11:30:00'),
-(2, 3, 180.00, 160.00, 400, 2, '2025-05-01 11:30:00'),
-(3, 5, 750.00, 700.00, 100, 9, '2025-05-01 09:15:00'),
-(3, 6, 1400.00, 1300.00, 50, 10, '2025-05-01 09:15:00'),
-(4, 7, 2200.00, 1900.00, 30, 4, '2025-05-01 14:20:00'),
-(5, 8, 5500.00, 4800.00, 10, 2, '2025-05-01 16:45:00');
-
--- 数据示例：trade_history
-INSERT INTO trade_history (user_id, ship_id, station_id, commodity_id, quantity, unit_price, total_price, transaction_type, tax_amount)
-VALUES 
-(1, 1, 1, 1, 10, 50.00, 500.00, 'buy', 17.50),
-(1, 1, 1, 2, 5, 100.00, 500.00, 'buy', 17.50),
-(2, 2, 1, 3, 50, 180.00, 9000.00, 'buy', 360.00),
-(2, 2, 2, 1, 20, 55.00, 1100.00, 'sell', 44.00),
-(3, 3, 3, 5, 5, 750.00, 3750.00, 'buy', 187.50),
-(3, 3, 4, 6, 2, 1900.00, 3800.00, 'sell', 0.00);
 
 -- -----------------------------------------------------
 -- 任务和战斗表

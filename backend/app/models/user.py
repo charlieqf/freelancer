@@ -1,8 +1,9 @@
 """
 Freelancer游戏 - 用户模型
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import create_access_token, create_refresh_token
 
 from .. import db
 
@@ -65,6 +66,33 @@ class User(db.Model):
             return False
         self.credits -= amount
         return True
+        
+    def generate_tokens(self):
+        """生成JWT访问令牌和刷新令牌
+        
+        Returns:
+            dict: 包含访问令牌、刷新令牌和用户信息的字典
+        """
+        access_token = create_access_token(
+            identity=str(self.user_id),  
+            additional_claims={
+                'username': self.username,
+                'faction_id': self.faction_id,
+                'email': self.email
+            },
+            expires_delta=timedelta(minutes=30)
+        )
+        
+        refresh_token = create_refresh_token(
+            identity=str(self.user_id),  
+            expires_delta=timedelta(days=7)
+        )
+        
+        return {
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'user': self.to_dict()
+        }
     
     def to_dict(self):
         """转换为字典，用于API响应"""
