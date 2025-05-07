@@ -1,6 +1,7 @@
 import { createStore } from 'vuex'
 import auth from './modules/auth'
 import universe from './modules/universe'
+import gameSaves from './modules/gameSaves'
 
 export default createStore({
   state: {
@@ -36,6 +37,7 @@ export default createStore({
   },
   modules: {
     auth,
-    universe
+    universe,
+    gameSaves
   }
 })

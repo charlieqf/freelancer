@@ -16,13 +16,6 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
     avatar_url = db.Column(db.String(255))
-    credits = db.Column(db.Numeric(15, 2), default=1000.00)
-    reputation = db.Column(db.Integer, default=0)
-    # 暂时注释掉外键约束，等导入完整架构后再启用
-    # faction_id = db.Column(db.Integer, db.ForeignKey('factions.faction_id'))
-    faction_id = db.Column(db.Integer)
-    # current_system_id = db.Column(db.Integer, db.ForeignKey('star_systems.system_id'))
-    current_system_id = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     
@@ -56,16 +49,8 @@ class User(db.Model):
         """更新最后登录时间"""
         self.last_login = datetime.utcnow()
     
-    def add_credits(self, amount):
-        """增加游戏币"""
-        self.credits += amount
-    
-    def deduct_credits(self, amount):
-        """扣除游戏币"""
-        if self.credits < amount:
-            return False
-        self.credits -= amount
-        return True
+    # 注意：移除add_credits和deduct_credits方法
+    # 游戏币现在已经移动到GameSave模型中
         
     def generate_tokens(self):
         """生成JWT访问令牌和刷新令牌
@@ -77,7 +62,6 @@ class User(db.Model):
             identity=str(self.user_id),  
             additional_claims={
                 'username': self.username,
-                'faction_id': self.faction_id,
                 'email': self.email
             },
             expires_delta=timedelta(minutes=30)
@@ -101,10 +85,6 @@ class User(db.Model):
             'username': self.username,
             'email': self.email,
             'avatar_url': self.avatar_url,
-            'credits': float(self.credits),
-            'reputation': self.reputation,
-            'faction_id': self.faction_id,
-            'current_system_id': self.current_system_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None
         }

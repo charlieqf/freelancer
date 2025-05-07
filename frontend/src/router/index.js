@@ -7,6 +7,7 @@ import Register from '../views/auth/Register.vue'
 import Dashboard from '../views/Dashboard.vue'
 import Profile from '../views/auth/Profile.vue'
 import ChangePassword from '../views/auth/ChangePassword.vue'
+import GameSaves from '../views/game/GameSaves.vue'
 import NotFound from '../views/NotFound.vue'
 
 // 路由配置
@@ -87,6 +88,12 @@ const routes = [
         path: 'shipyard',
         name: 'Shipyard',
         component: () => import('../views/Shipyard.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'game-saves',
+        name: 'GameSaves',
+        component: GameSaves,
         meta: { requiresAuth: true }
       }
     ]

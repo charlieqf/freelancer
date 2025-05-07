@@ -7,6 +7,7 @@ api_bp = Blueprint('api', __name__)
 
 # 从该包中导入路由模块
 from . import users
+from . import game_saves
 from .auth import auth_bp
 from .universe import universe_bp
 

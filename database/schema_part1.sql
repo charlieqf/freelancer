@@ -185,7 +185,7 @@ CREATE TABLE game_saves (
     -- 游戏进度概述
     credits INT DEFAULT 1000 COMMENT '游戏币',
     current_system_id INT COMMENT '当前星系ID',
-    reputation_level INT DEFAULT 1 COMMENT '声望等级',
+    reputation INT DEFAULT 1 COMMENT '声望等级',
     faction_id INT COMMENT '加入的阵营ID',
     discovered_systems_count INT DEFAULT 0 COMMENT '已发现星系数',
     completed_missions_count INT DEFAULT 0 COMMENT '已完成任务数',
@@ -196,9 +196,11 @@ CREATE TABLE game_saves (
     
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (current_system_id) REFERENCES star_systems(system_id) ON DELETE SET NULL,
+    FOREIGN KEY (faction_id) REFERENCES factions(faction_id) ON DELETE SET NULL,
     
     INDEX idx_user_id (user_id),
-    INDEX idx_last_played_at (last_played_at)
+    INDEX idx_last_played_at (last_played_at),
+    INDEX idx_faction_id (faction_id)
 ) COMMENT '存储玩家的游戏存档';
 
 -- 用户成就表

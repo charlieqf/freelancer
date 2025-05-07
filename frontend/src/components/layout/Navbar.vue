@@ -13,11 +13,15 @@
           <router-link to="/missions" class="navbar-item">任务</router-link>
           <router-link to="/trade" class="navbar-item">交易</router-link>
           <router-link to="/shipyard" class="navbar-item">船坞</router-link>
+          <router-link to="/game-saves" class="navbar-item">存档管理</router-link>
         </div>
         
         <div class="navbar-end">
-          <div class="navbar-item credits">
-            <span>游戏币: {{ currentUser?.credits || 0 }} 💰</span>
+          <div class="navbar-item credits" v-if="currentGameSave">
+            <span>游戏币: {{ currentGameSave?.credits || 0 }} 💰</span>
+          </div>
+          <div class="navbar-item save-name" v-if="currentGameSave">
+            <span>当前存档: {{ currentGameSave?.save_name }}</span>
           </div>
           <div class="navbar-item">
             <div class="dropdown">
@@ -60,6 +64,7 @@ export default {
     // 从store获取认证状态和用户信息
     const isAuthenticated = computed(() => store.getters['auth/isAuthenticated'])
     const currentUser = computed(() => store.getters['auth/currentUser'])
+    const currentGameSave = computed(() => store.getters['gameSaves/currentGameSave'])
     
     // 处理登出
     const handleLogout = async () => {
@@ -74,6 +79,7 @@ export default {
     return {
       isAuthenticated,
       currentUser,
+      currentGameSave,
       handleLogout
     }
   }
