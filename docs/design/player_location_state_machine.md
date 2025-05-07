@@ -2,7 +2,7 @@
 
 ## 1. 概述
 
-本文档详细描述Freelancer游戏中玩家位置的状态机设计。玩家在游戏世界中的位置是一个复杂的状态系统，需要精确跟踪玩家在宇宙、星系、行星、空间站等位置间的移动和状态变化。
+本文档详细描述Freelancer游戏中玩家位置的状态机设计。玩家在游戏世界中的位置是一个复杂的状态系统，需要精确跟踪玩家在宇宙、星系、行星、空间站等位置间的移动和状态变化。在多存档系统中，每个用户可以有多个独立的游戏存档，每个存档都有自己独立的位置状态。
 
 ### 1.1 设计目标
 
@@ -11,6 +11,7 @@
 - 提供清晰的API来读取和更新玩家位置
 - 支持游戏功能如任务系统、交易系统和社交互动
 - 易于扩展以适应未来的游戏功能
+- 支持多存档系统，每个存档有独立的位置状态
 
 ### 1.2 状态机基本原理
 
@@ -31,7 +32,7 @@
 ```sql
 CREATE TABLE player_locations (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    player_id INT NOT NULL,
+    user_id INT NOT NULL,
     
     -- 物理位置层
     system_id INT,
@@ -56,7 +57,8 @@ CREATE TABLE player_locations (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
     -- 外键关联
-    FOREIGN KEY (player_id) REFERENCES players(player_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
     FOREIGN KEY (system_id) REFERENCES star_systems(system_id),
     FOREIGN KEY (planet_id) REFERENCES planets(planet_id),
     FOREIGN KEY (station_id) REFERENCES stations(station_id)
@@ -71,7 +73,8 @@ class PlayerLocation(db.Model):
     __tablename__ = 'player_locations'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    player_id = db.Column(db.Integer, db.ForeignKey('players.player_id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey('game_saves.game_id'), nullable=False)
     
     # 物理位置层
     system_id = db.Column(db.Integer, db.ForeignKey('star_systems.system_id'))
@@ -96,7 +99,8 @@ class PlayerLocation(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # 关系
-    player = db.relationship('Player', backref='location')
+    user = db.relationship('User', backref='location')
+    game_save = db.relationship('GameSave', backref='player_locations')
     system = db.relationship('StarSystem')
     planet = db.relationship('Planet')
     station = db.relationship('SpaceStation')
@@ -361,3 +365,188 @@ class PlayerLocation(db.Model):
 1. 只记录关键位置变更（首次访问、完成任务等）
 2. 使用单独的 `player_location_history` 表
 3. 添加记录原因（reason 字段）
+
+## 7. 数据库表结构完整定义
+
+以下是玩家位置相关表的完整SQL定义，包括当前位置表和历史位置表。
+
+### 7.1 player_locations 表定义
+
+```sql
+-- 玩家当前位置表
+CREATE TABLE player_locations (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    game_id INT NOT NULL,  -- 新增：关联到特定存档
+    
+    -- 物理位置层
+    system_id INT,
+    planet_id INT,
+    station_id INT,
+    
+    -- 交通模式层
+    transport_mode VARCHAR(20),  -- 'on_foot', 'in_ship', 'in_vehicle'
+    transport_id INT,            -- 飞船或车辆的ID
+    
+    -- 活动状态层
+    activity_state VARCHAR(20),  -- 'exploring', 'trading', 'docked', 'in_transit', 'combat', 'mission'
+    
+    -- 额外信息
+    area_type VARCHAR(20),       -- 'bar', 'hangar', 'market', 'mission_board', 'equipment_shop', 'inn'
+    
+    -- 过渡状态信息
+    destination_id INT,
+    destination_type VARCHAR(20), -- 'system', 'planet', 'station'
+    estimated_arrival_time DATETIME, -- 预计到达时间
+    
+    -- 时间戳
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- 外键关联
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    FOREIGN KEY (system_id) REFERENCES star_systems(system_id) ON DELETE SET NULL,
+    FOREIGN KEY (planet_id) REFERENCES planets(planet_id) ON DELETE SET NULL,
+    FOREIGN KEY (station_id) REFERENCES stations(station_id) ON DELETE SET NULL,
+    
+    -- 索引
+    INDEX idx_user_game (user_id, game_id),  -- 更新：组合索引提高查询效率
+    INDEX idx_system_id (system_id),
+    INDEX idx_transport_id (transport_id),
+    INDEX idx_activity_state (activity_state)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+### 7.2 player_location_history 表定义
+
+```sql
+-- 玩家位置历史记录表
+CREATE TABLE player_location_history (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    game_id INT NOT NULL,  -- 新增：关联到特定存档
+    
+    -- 物理位置层
+    system_id INT,
+    planet_id INT,
+    station_id INT,
+    
+    -- 交通模式层
+    transport_mode VARCHAR(20),
+    transport_id INT,
+    
+    -- 活动状态层
+    activity_state VARCHAR(20),
+    area_type VARCHAR(20),
+    
+    -- 记录原因和备注
+    reason VARCHAR(50), -- 'first_visit', 'mission_start', 'mission_complete', 'combat', 'trade', 'discovery'
+    notes TEXT,
+    
+    -- 时间戳
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 外键关联
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    
+    -- 索引
+    INDEX idx_user_game (user_id, game_id),  -- 更新：组合索引提高查询效率
+    INDEX idx_system_id (system_id),
+    INDEX idx_created_at (created_at),
+    INDEX idx_reason (reason)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+## 8. 示例数据插入
+
+以下是一些示例数据插入语句，展示了如何在实际使用中记录玩家位置。
+
+### 8.1 当前位置数据示例
+
+```sql
+-- 插入玩家当前位置数据
+INSERT INTO player_locations 
+(user_id, game_id, system_id, planet_id, station_id, transport_mode, transport_id, activity_state, area_type) 
+VALUES
+-- 玩家 1，存档 1：在西格玛星系内驾驶飞船
+(1, 1, 42, NULL, NULL, 'in_ship', 101, 'exploring', NULL),
+
+-- 玩家 2，存档 1：在马尼拉空间站的酒吧中
+(2, 1, 57, NULL, 156, 'on_foot', 204, 'exploring', 'bar'),
+
+-- 玩家 3，存档 1：在新地球行星上驾驶车辆
+(3, 1, 65, 23, NULL, 'in_vehicle', 304, 'exploring', NULL),
+
+-- 玩家 4，存档 1：正在跃迁到另一个星系
+(4, 1, 70, NULL, NULL, 'in_ship', 405, 'in_transit', NULL, 82, 'system', DATE_ADD(NOW(), INTERVAL 2 MINUTE)),
+
+-- 玩家 5，存档 1：在空间站市场进行交易
+(5, 1, 90, NULL, 203, 'on_foot', 506, 'trading', 'market');
+```
+
+### 8.2 历史位置数据示例
+
+```sql
+-- 插入玩家历史位置数据
+INSERT INTO player_location_history 
+(user_id, game_id, system_id, planet_id, station_id, transport_mode, transport_id, activity_state, area_type, reason, notes, created_at) 
+VALUES
+-- 玩家 1，存档 1：首次访问西格玛星系
+(1, 1, 42, NULL, NULL, 'in_ship', 101, 'exploring', NULL, 'first_visit', '首次进入西格玛星系', '2025-05-06 10:15:22'),
+
+-- 玩家 1，存档 1：完成了探索任务
+(1, 1, 42, NULL, 156, 'on_foot', 101, 'mission', 'mission_board', 'mission_complete', '完成了星系探索任务', '2025-05-06 14:23:45'),
+
+-- 玩家 2，存档 1：在太空中遇到海盗并进行战斗
+(2, 1, 57, NULL, NULL, 'in_ship', 204, 'combat', NULL, 'combat', '与黑鹰海盗团发生冲突', '2025-05-06 16:45:12'),
+
+-- 玩家 3，存档 1：发现新行星
+(3, 1, 65, 23, NULL, 'in_ship', 304, 'exploring', NULL, 'discovery', '发现了新地球行星', '2025-05-06 18:12:33'),
+
+-- 玩家 4，存档 1：完成重要交易
+(4, 1, 70, NULL, 180, 'on_foot', 405, 'trading', 'market', 'trade', '购买了高级飞船发动机', '2025-05-06 20:05:18');
+
+-- 玩家 1，存档 2：在不同存档中的位置
+(1, 2, 35, NULL, NULL, 'in_ship', 101, 'exploring', NULL, 'first_visit', '新存档中的初始位置', '2025-05-07 09:10:15');
+```
+
+### 8.3 查询示例
+
+以下是一些常用的查询示例，展示如何访问和分析玩家位置数据：
+
+```sql
+-- 查询指定玩家的当前位置
+SELECT pl.*, 
+       s.name as system_name, 
+       p.name as planet_name, 
+       st.name as station_name
+FROM player_locations pl
+LEFT JOIN star_systems s ON pl.system_id = s.system_id
+LEFT JOIN planets p ON pl.planet_id = p.planet_id
+LEFT JOIN stations st ON pl.station_id = st.station_id
+WHERE pl.user_id = 1 AND pl.game_id = 1;  -- 添加game_id条件
+
+-- 查询指定星系内的所有玩家（跨存档）
+SELECT pl.*, p.username, gs.save_name
+FROM player_locations pl
+JOIN users p ON pl.user_id = p.user_id
+JOIN game_saves gs ON pl.game_id = gs.game_id
+WHERE pl.system_id = 42;
+
+-- 查询玩家历史访问过的不同星系
+SELECT DISTINCT plh.system_id, s.name as system_name, 
+       MIN(plh.created_at) as first_visit_time
+FROM player_location_history plh
+JOIN star_systems s ON plh.system_id = s.system_id
+WHERE plh.user_id = 1 AND plh.game_id = 1 AND plh.reason = 'first_visit'
+GROUP BY plh.system_id, s.name
+ORDER BY first_visit_time;
+
+-- 寻找当前正在跃迁中的玩家（指定存档）
+SELECT pl.*, p.username
+FROM player_locations pl
+JOIN users p ON pl.user_id = p.user_id
+WHERE pl.activity_state = 'in_transit' AND pl.game_id = 1;
+```
