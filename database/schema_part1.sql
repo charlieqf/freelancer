@@ -27,6 +27,20 @@ CREATE TABLE star_systems (
     is_discovered BOOLEAN DEFAULT FALSE COMMENT '是否已被玩家发现'
 ) COMMENT '存储游戏中所有星系的信息';
 
+-- 势力表
+-- 定义游戏中的各个势力
+CREATE TABLE factions (
+    faction_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '势力ID，主键',
+    name VARCHAR(100) NOT NULL COMMENT '势力名称',
+    description TEXT COMMENT '势力描述',
+    government_type VARCHAR(50) COMMENT '政府类型',
+    primary_industry VARCHAR(50) COMMENT '主要产业',
+    home_system_id INT COMMENT '势力母星系ID',
+    is_player_accessible BOOLEAN DEFAULT TRUE COMMENT '玩家是否可加入',
+    icon_url VARCHAR(255) COMMENT '势力图标URL',
+    FOREIGN KEY (home_system_id) REFERENCES star_systems(system_id)
+) COMMENT '定义游戏中的各个势力';
+
 -- 行星表
 -- 存储星系中的行星
 CREATE TABLE planets (
@@ -40,6 +54,21 @@ CREATE TABLE planets (
     orbital_position FLOAT COMMENT '轨道位置',
     FOREIGN KEY (system_id) REFERENCES star_systems(system_id) ON DELETE CASCADE
 ) COMMENT '存储星系中的行星信息';
+
+-- 制造商表
+-- 存储游戏中的制造商信息
+CREATE TABLE manufacturers (
+    manufacturer_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '制造商ID，主键',
+    name VARCHAR(100) NOT NULL COMMENT '制造商名称',
+    description TEXT COMMENT '制造商描述',
+    faction_id INT COMMENT '所属势力ID',
+    specialization VARCHAR(100) COMMENT '专长领域',
+    reputation_bonus INT DEFAULT 0 COMMENT '声望加成',
+    headquarters_system_id INT COMMENT '总部所在星系',
+    logo_url VARCHAR(255) COMMENT '制造商标志URL',
+    established_date VARCHAR(50) COMMENT '成立日期',
+    FOREIGN KEY (faction_id) REFERENCES factions(faction_id)
+) COMMENT '存储游戏中的制造商信息';
 
 CREATE TABLE items (
     item_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '物品ID，主键',
@@ -138,26 +167,54 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希值',
     email VARCHAR(100) UNIQUE NOT NULL COMMENT '电子邮件，唯一',
     avatar_url VARCHAR(255) COMMENT '用户头像或代表图URL',
-    credits DECIMAL(15,2) DEFAULT 1000.00 COMMENT '用户拥有的游戏币，初始1000',
-    reputation INT DEFAULT 0 COMMENT '用户的全局声望值',
-    faction_id INT COMMENT '初始加入的阵营ID',
-    current_system_id INT COMMENT '用户当前所在的星系ID',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '账户创建时间',
-    last_login DATETIME COMMENT '上次登录时间',
-    FOREIGN KEY (current_system_id) REFERENCES star_systems(system_id)
+    last_login DATETIME COMMENT '上次登录时间'
 ) COMMENT '存储用户账户信息和基础游戏状态';
+
+-- 游戏存档表
+-- 存储玩家的游戏存档
+CREATE TABLE game_saves (
+    game_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '存档ID，主键',
+    user_id INT NOT NULL COMMENT '用户ID',
+    save_name VARCHAR(50) NOT NULL COMMENT '存档名称',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    last_played_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后游玩时间',
+    game_version VARCHAR(20) COMMENT '游戏版本',
+    total_playtime INT DEFAULT 0 COMMENT '总游玩时间(秒)',
+    
+    -- 游戏进度概述
+    credits INT DEFAULT 1000 COMMENT '游戏币',
+    current_system_id INT COMMENT '当前星系ID',
+    reputation_level INT DEFAULT 1 COMMENT '声望等级',
+    faction_id INT COMMENT '加入的阵营ID',
+    discovered_systems_count INT DEFAULT 0 COMMENT '已发现星系数',
+    completed_missions_count INT DEFAULT 0 COMMENT '已完成任务数',
+    
+    -- 可选字段
+    thumbnail_path VARCHAR(255) COMMENT '存档缩略图路径',
+    status VARCHAR(20) DEFAULT 'active' COMMENT '存档状态',
+    
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (current_system_id) REFERENCES star_systems(system_id) ON DELETE SET NULL,
+    
+    INDEX idx_user_id (user_id),
+    INDEX idx_last_played_at (last_played_at)
+) COMMENT '存储玩家的游戏存档';
 
 -- 用户成就表
 -- 记录用户获得的成就
 CREATE TABLE user_achievements (
     achievement_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '成就ID，主键',
     user_id INT NOT NULL COMMENT '用户ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     achievement_type VARCHAR(50) NOT NULL COMMENT '成就类型(探索/贸易/战斗等)',
     achievement_name VARCHAR(100) NOT NULL COMMENT '成就名称',
     description TEXT COMMENT '成就描述',
     points INT DEFAULT 0 COMMENT '成就点数，用于排行榜等',
     achieved_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '获得成就的时间',
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    INDEX idx_user_game (user_id, game_id)
 ) COMMENT '记录用户获得的游戏成就';
 
 
@@ -165,19 +222,6 @@ CREATE TABLE user_achievements (
 -- 势力关系表
 -- -----------------------------------------------------
 
--- 势力表
--- 定义游戏中的各个势力
-CREATE TABLE factions (
-    faction_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '势力ID，主键',
-    name VARCHAR(100) NOT NULL COMMENT '势力名称',
-    description TEXT COMMENT '势力描述',
-    government_type VARCHAR(50) COMMENT '政府类型',
-    primary_industry VARCHAR(50) COMMENT '主要产业',
-    home_system_id INT COMMENT '势力母星系ID',
-    is_player_accessible BOOLEAN DEFAULT TRUE COMMENT '玩家是否可加入',
-    icon_url VARCHAR(255) COMMENT '势力图标URL',
-    FOREIGN KEY (home_system_id) REFERENCES star_systems(system_id)
-) COMMENT '定义游戏中的各个势力';
 
 -- 势力关系表
 -- 记录不同势力之间的关系
@@ -198,12 +242,15 @@ CREATE TABLE faction_relationships (
 CREATE TABLE player_faction_standing (
     standing_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '关系ID，主键',
     user_id INT NOT NULL COMMENT '用户ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     faction_id INT NOT NULL COMMENT '势力ID',
     standing_value INT DEFAULT 0 COMMENT '关系值(-100到100)',
     title VARCHAR(50) NULL COMMENT '玩家在势力中的头衔',
     last_changed DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '关系最后更新时间',
     FOREIGN KEY (user_id) REFERENCES users(user_id),
-    FOREIGN KEY (faction_id) REFERENCES factions(faction_id)
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    FOREIGN KEY (faction_id) REFERENCES factions(faction_id),
+    INDEX idx_user_game_faction (user_id, game_id, faction_id)
 ) COMMENT '记录玩家与各势力的关系';
 
 -- 数据示例：factions
@@ -270,20 +317,6 @@ VALUES
 (3, 1, 70, '英雄'),
 (3, 4, -80, '头号敌人');
 
--- 制造商表
--- 存储游戏中的制造商信息
-CREATE TABLE manufacturers (
-    manufacturer_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '制造商ID，主键',
-    name VARCHAR(100) NOT NULL COMMENT '制造商名称',
-    description TEXT COMMENT '制造商描述',
-    faction_id INT COMMENT '所属势力ID',
-    specialization VARCHAR(100) COMMENT '专长领域',
-    reputation_bonus INT DEFAULT 0 COMMENT '声望加成',
-    headquarters_system_id INT COMMENT '总部所在星系',
-    logo_url VARCHAR(255) COMMENT '制造商标志URL',
-    established_date VARCHAR(50) COMMENT '成立日期',
-    FOREIGN KEY (faction_id) REFERENCES factions(faction_id)
-) COMMENT '存储游戏中的制造商信息';
 
 
 -- -----------------------------------------------------
@@ -319,6 +352,7 @@ CREATE TABLE ship_models (
 CREATE TABLE player_ships (
     ship_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '飞船实例ID，主键',
     user_id INT NOT NULL COMMENT '拥有者ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     model_id INT NOT NULL COMMENT '飞船型号ID',
     name VARCHAR(100) COMMENT '飞船自定义名称',
     current_health INT COMMENT '当前生命值',
@@ -335,7 +369,10 @@ CREATE TABLE player_ships (
     is_active BOOLEAN DEFAULT FALSE COMMENT '是否当前正在使用',
     purchased_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '购买时间',
     FOREIGN KEY (user_id) REFERENCES users(user_id),
-    FOREIGN KEY (model_id) REFERENCES ship_models(model_id)
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    FOREIGN KEY (model_id) REFERENCES ship_models(model_id),
+    INDEX idx_user_game (user_id, game_id),
+    INDEX idx_active_ship (user_id, game_id, is_active)
 ) COMMENT '记录玩家拥有的飞船信息';
 
 -- 装备类型表
@@ -371,12 +408,15 @@ CREATE TABLE equipment_items (
 CREATE TABLE ship_equipment (
     ship_equipment_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '关联ID，主键',
     ship_id INT NOT NULL COMMENT '飞船ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     equipment_id INT NOT NULL COMMENT '装备ID',
     slot_number TINYINT COMMENT '安装在飞船上的插槽编号',
-    condition TINYINT DEFAULT 100 COMMENT '装备当前状态(0-100)',
+    equipment_condition TINYINT DEFAULT 100 COMMENT '装备当前状态(0-100)',
     installed_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '安装时间',
     FOREIGN KEY (ship_id) REFERENCES player_ships(ship_id) ON DELETE CASCADE,
-    FOREIGN KEY (equipment_id) REFERENCES equipment_items(item_id)
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    FOREIGN KEY (equipment_id) REFERENCES equipment_items(item_id),
+    INDEX idx_ship_game (ship_id, game_id)
 ) COMMENT '记录飞船上安装的装备';
 
 -- 船上货物明细表
@@ -384,13 +424,16 @@ CREATE TABLE ship_equipment (
 CREATE TABLE ship_cargo_items (
     cargo_item_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '货物项ID',
     ship_id INT NOT NULL COMMENT '飞船ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     commodity_id INT NOT NULL COMMENT '商品ID',
     quantity INT NOT NULL COMMENT '数量',
     purchased_price DECIMAL(15,2) COMMENT '购买单价',
     source_location_id INT COMMENT '购买地点ID',
     source_location_type ENUM('station', 'planet', 'system') COMMENT '购买地点类型',
     acquired_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '获取时间',
-    FOREIGN KEY (ship_id) REFERENCES player_ships(ship_id) ON DELETE CASCADE
+    FOREIGN KEY (ship_id) REFERENCES player_ships(ship_id) ON DELETE CASCADE,
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    INDEX idx_ship_game (ship_id, game_id)
 ) COMMENT '记录飞船上装载的各种货物明细';
 
 -- 数据示例：manufacturers

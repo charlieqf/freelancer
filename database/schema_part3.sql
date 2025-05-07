@@ -25,12 +25,16 @@ CREATE TABLE game_events (
 CREATE TABLE player_discoveries (
     discovery_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '发现ID，主键',
     user_id INT NOT NULL COMMENT '用户ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     discovery_type ENUM('system', 'planet', 'station', 'anomaly') COMMENT '发现类型',
     object_id INT NOT NULL COMMENT '被发现对象的ID',
     discovery_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '发现时间',
     reward_credits DECIMAL(15,2) COMMENT '获得的奖励金额',
     reward_reputation INT COMMENT '获得的声望奖励',
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    INDEX idx_user_game (user_id, game_id),
+    INDEX idx_discovery_type (discovery_type)
 ) COMMENT '记录玩家的发现';
 
 -- 玩家统计数据表
@@ -38,6 +42,7 @@ CREATE TABLE player_discoveries (
 CREATE TABLE player_statistics (
     stat_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '统计ID，主键',
     user_id INT NOT NULL COMMENT '用户ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     systems_visited INT DEFAULT 0 COMMENT '访问过的星系数量',
     missions_completed INT DEFAULT 0 COMMENT '完成的任务数量',
     enemies_defeated INT DEFAULT 0 COMMENT '击败的敌人数量',
@@ -45,7 +50,9 @@ CREATE TABLE player_statistics (
     total_distance_traveled DECIMAL(15,2) DEFAULT 0.00 COMMENT '总旅行距离',
     total_playtime_minutes INT DEFAULT 0 COMMENT '总游戏时间(分钟)',
     last_updated DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后更新时间',
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    UNIQUE KEY uk_user_game (user_id, game_id)
 ) COMMENT '记录玩家的游戏统计数据';
 
 -- 数据示例：game_events
@@ -96,10 +103,14 @@ CREATE TABLE game_settings (
 CREATE TABLE game_logs (
     log_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '日志ID，主键',
     user_id INT NOT NULL COMMENT '用户ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     log_type VARCHAR(50) COMMENT '日志类型',
     message TEXT COMMENT '日志消息',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    INDEX idx_user_game (user_id, game_id),
+    INDEX idx_created_at (created_at)
 ) COMMENT '记录游戏中的重要事件日志';
 
 -- 数据示例：game_settings

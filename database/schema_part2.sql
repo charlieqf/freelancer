@@ -10,6 +10,7 @@ USE freelancer;
 -- 记录各空间站的商品价格
 CREATE TABLE market_prices (
     price_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '价格记录ID，主键',
+    game_id INT NOT NULL COMMENT '存档ID',
     station_id INT NOT NULL COMMENT '空间站ID',
     item_id INT NOT NULL COMMENT '商品ID',
     buy_price DECIMAL(15,2) COMMENT '玩家可以购买的价格',
@@ -17,8 +18,11 @@ CREATE TABLE market_prices (
     available_quantity INT COMMENT '市场上可用数量',
     demand_level TINYINT COMMENT '需求等级(1-10)',
     last_updated DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '价格最后更新时间',
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
     FOREIGN KEY (station_id) REFERENCES stations(station_id),
-    FOREIGN KEY (item_id) REFERENCES items(item_id)
+    FOREIGN KEY (item_id) REFERENCES items(item_id),
+    INDEX idx_game_station_item (game_id, station_id, item_id),
+    INDEX idx_last_updated (last_updated)
 ) COMMENT '记录每个空间站的商品价格信息';
 
 -- 交易历史表
@@ -26,6 +30,7 @@ CREATE TABLE market_prices (
 CREATE TABLE trade_history (
     trade_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '交易ID，主键',
     user_id INT NOT NULL COMMENT '用户ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     ship_id INT NOT NULL COMMENT '使用的飞船ID',
     station_id INT NOT NULL COMMENT '交易的空间站ID',
     item_id INT NOT NULL COMMENT '交易的商品ID',
@@ -36,9 +41,12 @@ CREATE TABLE trade_history (
     transaction_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '交易时间',
     tax_amount DECIMAL(15,2) DEFAULT 0.00 COMMENT '支付的交易税',
     FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
     FOREIGN KEY (ship_id) REFERENCES player_ships(ship_id),
     FOREIGN KEY (station_id) REFERENCES stations(station_id),
-    FOREIGN KEY (item_id) REFERENCES items(item_id)
+    FOREIGN KEY (item_id) REFERENCES items(item_id),
+    INDEX idx_user_game (user_id, game_id),
+    INDEX idx_transaction_time (transaction_time)
 ) COMMENT '记录所有玩家的交易历史';
 
 -- -----------------------------------------------------
@@ -89,6 +97,7 @@ CREATE TABLE missions (
 CREATE TABLE player_missions (
     player_mission_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '玩家任务ID，主键',
     user_id INT NOT NULL COMMENT '用户ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     mission_id INT NOT NULL COMMENT '任务ID',
     status ENUM('active', 'completed', 'failed', 'abandoned') DEFAULT 'active' COMMENT '任务状态',
     start_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '开始时间',
@@ -96,7 +105,10 @@ CREATE TABLE player_missions (
     current_progress INT DEFAULT 0 COMMENT '当前进度',
     total_steps INT COMMENT '总步骤数',
     FOREIGN KEY (user_id) REFERENCES users(user_id),
-    FOREIGN KEY (mission_id) REFERENCES missions(mission_id)
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
+    FOREIGN KEY (mission_id) REFERENCES missions(mission_id),
+    INDEX idx_user_game (user_id, game_id),
+    INDEX idx_mission_status (status)
 ) COMMENT '记录玩家接受的任务及其状态';
 
 -- 敌人类型表
@@ -120,6 +132,7 @@ CREATE TABLE enemy_types (
 CREATE TABLE combat_encounters (
     encounter_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '遭遇ID，主键',
     user_id INT NOT NULL COMMENT '用户ID',
+    game_id INT NOT NULL COMMENT '存档ID',
     player_ship_id INT NOT NULL COMMENT '玩家使用的飞船ID',
     system_id INT NOT NULL COMMENT '发生战斗的星系ID',
     enemy_type_id INT NOT NULL COMMENT '敌人类型ID',
@@ -130,9 +143,11 @@ CREATE TABLE combat_encounters (
     reward_credits DECIMAL(15,2) NULL COMMENT '获得的奖励金额',
     reward_reputation INT NULL COMMENT '获得的声望奖励',
     FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (game_id) REFERENCES game_saves(game_id) ON DELETE CASCADE,
     FOREIGN KEY (player_ship_id) REFERENCES player_ships(ship_id),
     FOREIGN KEY (system_id) REFERENCES star_systems(system_id),
-    FOREIGN KEY (enemy_type_id) REFERENCES enemy_types(enemy_type_id)
+    FOREIGN KEY (enemy_type_id) REFERENCES enemy_types(enemy_type_id),
+    INDEX idx_user_game (user_id, game_id)
 ) COMMENT '记录玩家的战斗经历';
 
 -- 数据示例：mission_types
