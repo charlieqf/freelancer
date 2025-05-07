@@ -2,7 +2,8 @@
   <div class="galaxy-map-page">
     <div class="galaxy-map-container">
       <div class="sidebar">
-        <div class="system-info" v-if="selectedSystem">
+        <!-- 星系信息 -->
+        <div class="system-info" v-if="selectedSystem && !selectedStation && !selectedJumpGate">
           <h3>{{ selectedSystem.name }}</h3>
           <div class="detail-line">
             <div class="detail-label">ID:</div>
@@ -25,9 +26,98 @@
             <div class="detail-value">{{ selectedSystem.planet_count || 0 }}</div>
           </div>
         </div>
-        <div class="system-select" v-else>
+        
+        <!-- 空间站信息 -->
+        <div class="station-info" v-if="selectedStation">
+          <div class="back-link" @click="deselectAll">
+            <i class="fas fa-arrow-left"></i> 返回
+          </div>
+          <h3>{{ selectedStation.name }}</h3>
+          <div class="detail-line">
+            <div class="detail-label">ID:</div>
+            <div class="detail-value">{{ selectedStation.station_id }}</div>
+          </div>
+          <div class="detail-line">
+            <div class="detail-label">所在星系:</div>
+            <div class="detail-value">{{ getSystemName(selectedStation.system_id) }}</div>
+          </div>
+          <div class="detail-line">
+            <div class="detail-label">控制势力:</div>
+            <div class="detail-value">{{ getControllingFaction(selectedStation.controlling_faction_id) }}</div>
+          </div>
+          <div class="detail-line">
+            <div class="detail-label">设施:</div>
+            <div class="detail-value">
+              <div class="facility-list">
+                <div v-if="selectedStation.has_shipyard" class="facility"><i class="fas fa-rocket"></i> 船坞</div>
+                <div v-if="selectedStation.has_shop || selectedStation.has_trade_center" class="facility"><i class="fas fa-exchange-alt"></i> 贸易中心</div>
+                <div v-if="selectedStation.has_bar" class="facility"><i class="fas fa-glass-martini"></i> 酒吧</div>
+                <div v-if="selectedStation.has_mission_board" class="facility"><i class="fas fa-tasks"></i> 任务板</div>
+                <div v-if="selectedStation.has_equipment_dealer" class="facility"><i class="fas fa-wrench"></i> 装备商</div>
+                <div v-if="selectedStation.has_inn" class="facility"><i class="fas fa-bed"></i> 旅店</div>
+              </div>
+            </div>
+          </div>
+          <div class="detail-line" v-if="selectedStation.market_tax_rate !== undefined">
+            <div class="detail-label">贸易税率:</div>
+            <div class="detail-value">{{ (selectedStation.market_tax_rate * 100).toFixed(1) }}%</div>
+          </div>
+          <div class="detail-line" v-if="selectedStation.description">
+            <div class="description">{{ selectedStation.description }}</div>
+          </div>
+          <div class="action-buttons">
+            <button class="action-button">
+              <i class="fas fa-compass"></i> 导航至此
+            </button>
+            <button class="action-button">
+              <i class="fas fa-info-circle"></i> 更多信息
+            </button>
+          </div>
+        </div>
+        
+        <!-- 跳跃点信息 -->
+        <div class="jumpgate-info" v-if="selectedJumpGate">
+          <div class="back-link" @click="deselectAll">
+            <i class="fas fa-arrow-left"></i> 返回
+          </div>
+          <h3>跳跃点 #{{ selectedJumpGate.gate_id || selectedJumpGate.id }}</h3>
+          <div class="detail-line">
+            <div class="detail-label">ID:</div>
+            <div class="detail-value">{{ selectedJumpGate.gate_id || selectedJumpGate.id }}</div>
+          </div>
+          <div class="detail-line">
+            <div class="detail-label">从:</div>
+            <div class="detail-value">{{ getSystemName(selectedJumpGate.source_system_id) }}</div>
+          </div>
+          <div class="detail-line">
+            <div class="detail-label">到:</div>
+            <div class="detail-value">{{ getSystemName(selectedJumpGate.target_system_id || selectedJumpGate.destination_system_id) }}</div>
+          </div>
+          <div class="detail-line">
+            <div class="detail-label">稳定性:</div>
+            <div class="detail-value">{{ selectedJumpGate.difficulty_level || selectedJumpGate.stability || 5 }}/10</div>
+          </div>
+          <div class="detail-line">
+            <div class="detail-label">通行费:</div>
+            <div class="detail-value">{{ selectedJumpGate.toll_fee > 0 ? `${selectedJumpGate.toll_fee} CR` : '免费' }}</div>
+          </div>
+          <div class="detail-line">
+            <div class="detail-label">状态:</div>
+            <div class="detail-value">{{ selectedJumpGate.is_hidden || selectedJumpGate.one_way ? '单向/隐蔽' : '公开' }}</div>
+          </div>
+          <div class="action-buttons">
+            <button class="action-button" @click="jumpToSystem(selectedJumpGate.target_system_id || selectedJumpGate.destination_system_id)">
+              <i class="fas fa-space-shuttle"></i> 跳跃
+            </button>
+            <button class="action-button">
+              <i class="fas fa-info-circle"></i> 情报
+            </button>
+          </div>
+        </div>
+        
+        <div class="system-select" v-if="!selectedSystem && !selectedStation && !selectedJumpGate">
           <h3>星系地图</h3>
-          <p>请选择一个星系来查看详细信息</p>
+          <p>请选择一个星系、空间站或跳跃点来查看详细信息</p>
         </div>
         
         <div class="map-filters">
@@ -141,6 +231,8 @@ export default {
     const svgContainer = ref(null)
     const zoom = ref(null)
     const selectedSystem = ref(null)
+    const selectedStation = ref(null)
+    const selectedJumpGate = ref(null)
     const systems = ref([])
     const stations = ref([])
     const jumpGates = ref([])
@@ -161,11 +253,21 @@ export default {
     const getSystemTypeName = (type) => {
       const types = {
         'core': '核心区域',
-        'mid': '中间区域',
-        'rim': '边缘区域',
-        'unknown': '未知区域'
+        'hub': '枢纽',
+        'border': '边境',
+        'outer': '外缘',
+        'disputed': '争议区域',
+        'unexplored': '未探索',
+        'special': '特殊区域'
       }
-      return types[type] || '未知'
+      return types[type] || type
+    }
+    
+    // 获取星系名称
+    const getSystemName = (systemId) => {
+      if (!systemId) return '未知星系'
+      const system = systems.value.find(s => s.system_id === systemId)
+      return system ? system.name : '未知星系'
     }
     
     // 获取控制势力名称
@@ -176,17 +278,7 @@ export default {
       return faction ? faction.name : '未知势力'
     }
     
-    // 获取星系名称
-    const getSystemName = (systemId) => {
-      if (!systemId) return '未知星系'
-      
-      const system = systems.value.find(s => s.system_id === systemId)
-      return system ? system.name : '未知星系'
-    }
-    
-    /**
-     * 获取星系半径，基于类型和重要性
-     */
+    // 获取星系半径，基于类型和重要性
     const getSystemRadius = (system) => {
       // 核心系统更大
       if (system.type === 'core') {
@@ -462,15 +554,17 @@ export default {
       // 使用我们从API加载的跳跃点数据
       jumpGates.value.forEach(gate => {
         const sourceSystem = systems.value.find(s => s.system_id === gate.source_system_id)
-        const targetSystem = systems.value.find(s => s.system_id === gate.target_system_id)
+        // 支持 target_system_id 和 destination_system_id 两种字段名
+        const targetSystem = systems.value.find(s => s.system_id === (gate.target_system_id || gate.destination_system_id))
         
         if (sourceSystem && targetSystem) {
           jumpgateData.push({
-            id: gate.gate_id,
+            id: gate.gate_id || gate.id,
+            gate: gate, // 保存原始数据对象以便在点击时使用
             source: sourceSystem,
             target: targetSystem,
-            hidden: gate.is_hidden,
-            dangerous: gate.difficulty_level > 5
+            hidden: gate.is_hidden || gate.one_way,
+            dangerous: (gate.difficulty_level || gate.stability || 0) > 5
           })
         }
       })
@@ -481,6 +575,10 @@ export default {
         .enter()
         .append('g')
         .attr('class', d => `jumpgate jumpgate-${d.id}`)
+        .on('click', (event, d) => {
+          event.stopPropagation() // 阻止事件冒泡
+          selectJumpGate(d.gate) // 使用原始的跳跃点数据
+        })
       
       // 添加跳跃点连线
       gateGroups.append('line')
@@ -495,12 +593,19 @@ export default {
       
       // 添加跳跃点标记
       gateGroups.append('circle')
+        .attr('class', 'jumpgate-marker')
         .attr('cx', d => (xScale(d.source.x_coord) + xScale(d.target.x_coord)) / 2)
         .attr('cy', d => (yScale(d.source.y_coord) + yScale(d.target.y_coord)) / 2)
         .attr('r', 3)
         .attr('fill', d => d.dangerous ? '#e74c3c' : (d.hidden ? '#555' : '#3498db'))
         .attr('stroke', '#fff')
         .attr('stroke-width', 0.5)
+        .on('mouseover', function() {
+          d3.select(this).attr('r', 5).attr('stroke-width', 1.5)
+        })
+        .on('mouseout', function() {
+          d3.select(this).attr('r', 3).attr('stroke-width', 0.5)
+        })
     }
     
     /**
@@ -545,6 +650,16 @@ export default {
           
           return `translate(${x}, ${y})`
         })
+        .on('click', (event, d) => {
+          event.stopPropagation() // 阻止事件冒泡
+          selectStation(d)
+        })
+        .on('mouseover', function() {
+          d3.select(this).select('rect').attr('stroke', '#fff').attr('stroke-width', 2)
+        })
+        .on('mouseout', function() {
+          d3.select(this).select('rect').attr('stroke', '#555').attr('stroke-width', 0.5)
+        })
       
       // 添加空间站图形
       stationNodes.append('rect')
@@ -552,33 +667,64 @@ export default {
         .attr('height', 10)
         .attr('x', -5)
         .attr('y', -5)
-        .attr('fill', d => getStationColor(d.type))
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 1)
-        .attr('transform', 'rotate(45)')
+        .attr('fill', d => {
+          // 根据空间站类型设置颜色
+          if (d.has_shipyard) return '#e74c3c' // 船坞为红色
+          if (d.has_trade_center || d.has_shop) return '#f1c40f' // 贸易中心为黄色
+          return '#3498db' // 默认蓝色
+        })
+        .attr('stroke', '#555')
+        .attr('stroke-width', 0.5)
+        .attr('rx', 2) // 圆角
+        .attr('ry', 2)
+        
+      // 添加空间站名称标签
+      stationNodes.append('text')
+        .attr('x', 0)
+        .attr('y', -8)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '8px')
+        .attr('fill', '#fff')
+        .attr('pointer-events', 'none') // 防止文本干扰鼠标事件
+        .text(d => d.name)
     }
     
-    /**
-     * 获取空间站的颜色，基于类型
-     */
-    const getStationColor = (type) => {
-      const colors = {
-        'trading': '#27ae60',    // 贸易站 - 绿色
-        'mining': '#f39c12',     // 矿业站 - 橙色
-        'military': '#c0392b',   // 军事站 - 红色
-        'research': '#3498db',   // 研究站 - 蓝色
-        'shipyard': '#8e44ad',   // 造船厂 - 紫色
-        'outpost': '#7f8c8d',    // 前哨站 - 灰色
-        'pirate': '#2c3e50'      // 海盗站 - 深蓝色
-      }
-      return colors[type] || '#95a5a6'
-    }
+    // 我们不再需要这个函数，因为我们在renderStations中直接设置了颜色
     
     /**
      * 选择星系
      */
     const selectSystem = (system) => {
       selectedSystem.value = system
+      selectedStation.value = null
+      selectedJumpGate.value = null
+    }
+    
+    /**
+     * 选择空间站
+     */
+    const selectStation = (station) => {
+      selectedStation.value = station
+      selectedSystem.value = null
+      selectedJumpGate.value = null
+    }
+    
+    /**
+     * 选择跳跃点
+     */
+    const selectJumpGate = (jumpGate) => {
+      selectedJumpGate.value = jumpGate
+      selectedSystem.value = null
+      selectedStation.value = null
+    }
+    
+    /**
+     * 取消选择
+     */
+    const deselectAll = () => {
+      selectedSystem.value = null
+      selectedStation.value = null
+      selectedJumpGate.value = null
     }
     
     /**
@@ -589,6 +735,35 @@ export default {
       nextTick(() => {
         renderMap();
       });
+    }
+    
+    /**
+     * 跳转到指定系统
+     */
+    const jumpToSystem = (systemId) => {
+      const system = systems.value.find(s => s.system_id === systemId)
+      if (system) {
+        // 获取当前的缩放和平移状态
+        let currentTransform = d3.zoomTransform(svgContainer.value.node());
+        let currentXScale = currentTransform.rescaleX(d3.scaleLinear().domain([0, galaxyMap.value.width]).range([0, galaxyMap.value.width]));
+        let currentYScale = currentTransform.rescaleY(d3.scaleLinear().domain([0, galaxyMap.value.height]).range([0, galaxyMap.value.height]));
+        
+        // 缩放到目标系统
+        const x = currentXScale(system.x_coord)
+        const y = currentYScale(system.y_coord)
+        
+        // 添加动画效果
+        d3.select(svgContainer.value)
+          .transition()
+          .duration(750)
+          .call(zoom.value.transform, 
+                d3.zoomIdentity
+                  .translate(galaxyMap.value.width / 2 - x, galaxyMap.value.height / 2 - y)
+                  .scale(1.5))
+          
+        // 选中目标系统
+        selectSystem(system)
+      }
     }
     
     // 组件挂载时加载数据和初始化D3
@@ -660,6 +835,8 @@ export default {
       galaxyMap,
       isLoading,
       selectedSystem,
+      selectedStation,
+      selectedJumpGate,
       zoomIn,
       zoomOut,
       resetView,
@@ -672,8 +849,12 @@ export default {
       getSystemTypeName,
       getSystemName,
       selectSystem,
+      selectStation,
+      selectJumpGate,
+      deselectAll,
       renderMap,
-      handleFilterChange
+      handleFilterChange,
+      jumpToSystem
     }
   }
 }
@@ -746,6 +927,108 @@ export default {
 .detail-value {
   color: #ecf0f1;
   white-space: normal; /* 允许文本换行 */
+}
+
+.station-info {
+  padding: 1rem;
+}
+
+.station-info h3 {
+  margin-top: 0;
+  color: #3498db;
+  margin-bottom: 1rem;
+}
+
+.station-info .back-link {
+  cursor: pointer;
+  color: #3498db;
+  margin-bottom: 1rem;
+}
+
+.station-info .back-link:hover {
+  text-decoration: underline;
+}
+
+.station-info .facility-list {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.station-info .facility {
+  margin-right: 1rem;
+  margin-bottom: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #3498db;
+  border-radius: 4px;
+  color: #3498db;
+  font-size: 12px;
+}
+
+.station-info .description {
+  margin-bottom: 1rem;
+  color: #ecf0f1;
+  font-size: 14px;
+}
+
+.station-info .action-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
+.station-info .action-button {
+  background-color: #3498db;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  font-size: 14px;
+}
+
+.station-info .action-button:hover {
+  background-color: #2ecc71;
+}
+
+.jumpgate-info {
+  padding: 1rem;
+}
+
+.jumpgate-info h3 {
+  margin-top: 0;
+  color: #3498db;
+  margin-bottom: 1rem;
+}
+
+.jumpgate-info .back-link {
+  cursor: pointer;
+  color: #3498db;
+  margin-bottom: 1rem;
+}
+
+.jumpgate-info .back-link:hover {
+  text-decoration: underline;
+}
+
+.jumpgate-info .action-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
+.jumpgate-info .action-button {
+  background-color: #3498db;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  font-size: 14px;
+}
+
+.jumpgate-info .action-button:hover {
+  background-color: #2ecc71;
 }
 
 .system-select {
